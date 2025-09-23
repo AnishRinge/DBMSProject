@@ -1,0 +1,8 @@
+SELECT * FROM Booking ORDER BY booking_id DESC LIMIT 1;
+SELECT * FROM Payment ORDER BY payment_id DESC LIMIT 1;
+SELECT stay_date, qty
+FROM RoomInventory
+WHERE room_type_id = 2
+  AND stay_date >= DATE_ADD(CURRENT_DATE, INTERVAL 1 DAY)
+  AND stay_date < DATE_ADD(CURRENT_DATE, INTERVAL 3 DAY)
+ORDER BY stay_date;

@@ -1,0 +1,126 @@
+USE travel_booking;
+
+-- Safety: make sure InnoDB is used (we defined ENGINE=InnoDB in schema)
+
+-- Helper: iterate dates and adjust inventory (delta = -1 to book, +1 to restore)
+DELIMITER $$
+CREATE PROCEDURE adjust_inventory_range(
+    IN p_room_type_id INT,
+    IN p_check_in DATE,
+    IN p_check_out DATE,
+    IN p_delta INT
+)
+BEGIN
+  DECLARE d DATE;
+  SET d = p_check_in;
+  WHILE d < p_check_out DO
+    UPDATE RoomInventory
+    SET qty = qty + p_delta
+    WHERE room_type_id = p_room_type_id
+      AND stay_date = d;
+    SET d = DATE_ADD(d, INTERVAL 1 DAY);
+  END WHILE;
+END$$
+DELIMITER ;
+
+-- MAIN: Make a booking (locks inventory rows to prevent race conditions)
+-- Fails if any date has no stock.
+
+DELIMITER $$
+CREATE PROCEDURE MakeBooking(
+    IN p_user_id INT,
+    IN p_room_type_id INT,
+    IN p_check_in DATE,
+    IN p_check_out DATE,
+    IN p_amount DECIMAL(10,2),
+    IN p_method ENUM('CARD','UPI','NETBANKING','CASH')
+)
+proc:BEGIN
+  DECLARE needed INT;
+  DECLARE available INT;
+  DECLARE d DATE;
+  DECLARE done INT DEFAULT 0;
+
+  -- Basic validation
+  IF p_check_in IS NULL OR p_check_out IS NULL OR p_check_in >= p_check_out THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Invalid dates';
+  END IF;
+
+  START TRANSACTION;
+
+  -- Count days needed
+  SET needed = DATEDIFF(p_check_out, p_check_in);
+
+  -- Ensure inventory rows exist & have stock; lock them FOR UPDATE
+  SELECT COUNT(*) INTO available
+  FROM RoomInventory
+  WHERE room_type_id = p_room_type_id
+    AND stay_date >= p_check_in
+    AND stay_date <  p_check_out
+    AND qty > 0
+  FOR UPDATE;
+
+  IF available <> needed THEN
+    ROLLBACK;
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Insufficient inventory for one or more dates';
+  END IF;
+
+  -- Create booking as CONFIRMED
+  INSERT INTO Booking(user_id, room_type_id, check_in, check_out, status)
+  VALUES (p_user_id, p_room_type_id, p_check_in, p_check_out, 'CONFIRMED');
+
+  -- Decrement inventory day-by-day
+  CALL adjust_inventory_range(p_room_type_id, p_check_in, p_check_out, -1);
+
+  -- Create successful payment
+  INSERT INTO Payment(booking_id, amount, method, status, paid_at)
+  VALUES (LAST_INSERT_ID(), p_amount, p_method, 'SUCCESS', NOW());
+
+  COMMIT;
+END$$
+DELIMITER ;
+
+-- CANCEL: restore stock and mark refund
+
+DELIMITER $$
+CREATE PROCEDURE CancelBooking(IN p_booking_id BIGINT)
+BEGIN
+  DECLARE v_room_type_id INT;
+  DECLARE v_check_in DATE;
+  DECLARE v_check_out DATE;
+  DECLARE v_status ENUM('PENDING','CONFIRMED','CANCELLED');
+
+  -- Lock the booking row
+  START TRANSACTION;
+  SELECT room_type_id, check_in, check_out, status
+    INTO v_room_type_id, v_check_in, v_check_out, v_status
+  FROM Booking
+  WHERE booking_id = p_booking_id
+  FOR UPDATE;
+
+  IF v_room_type_id IS NULL THEN
+    ROLLBACK;
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Booking not found';
+  END IF;
+
+  IF v_status = 'CANCELLED' THEN
+    ROLLBACK;
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Booking already cancelled';
+  END IF;
+
+  -- Mark cancelled
+  UPDATE Booking
+  SET status = 'CANCELLED'
+  WHERE booking_id = p_booking_id;
+
+  -- Restore inventory
+  CALL adjust_inventory_range(v_room_type_id, v_check_in, v_check_out, +1);
+
+  -- Mark payment refunded (if payment exists)
+  UPDATE Payment
+  SET status = 'REFUNDED'
+  WHERE booking_id = p_booking_id;
+
+  COMMIT;
+END$$
+DELIMITER ;

@@ -1,0 +1,8 @@
+SELECT booking_id, status FROM Booking WHERE booking_id = 2;
+SELECT * FROM Payment WHERE booking_id = 2;
+SELECT stay_date, qty
+FROM RoomInventory
+WHERE room_type_id = 2
+  AND stay_date >= DATE_ADD(CURRENT_DATE, INTERVAL 1 DAY)
+  AND stay_date < DATE_ADD(CURRENT_DATE, INTERVAL 3 DAY)
+ORDER BY stay_date;

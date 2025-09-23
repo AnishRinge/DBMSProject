@@ -1,0 +1,16 @@
+SELECT user_id, full_name FROM `User`;
+SELECT room_type_id, name, hotel_id FROM RoomType;
+SELECT stay_date, qty
+FROM RoomInventory
+WHERE room_type_id = 2
+  AND stay_date >= CURRENT_DATE
+  AND stay_date < DATE_ADD(CURRENT_DATE, INTERVAL 5 DAY)
+ORDER BY stay_date;
+CALL MakeBooking(
+  1,                         -- your user_id
+  2,                    -- chosen room_type_id
+  DATE_ADD(CURRENT_DATE, INTERVAL 1 DAY),  -- check-in tomorrow
+  DATE_ADD(CURRENT_DATE, INTERVAL 3 DAY),  -- check-out 2 nights later
+  9000.00,                           -- amount
+  'CARD'                             -- payment method
+);

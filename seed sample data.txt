@@ -1,0 +1,66 @@
+USE travel_booking;
+
+-- Cities
+INSERT INTO City (name, country) VALUES
+('Mumbai', 'India'),
+('Goa', 'India');
+
+-- Users
+INSERT INTO `User` (full_name, email, phone, role) VALUES
+('Anish Ringe', 'anish@example.com', '+91-9000000001', 'CUSTOMER'),
+('Admin User', 'admin@example.com', '+91-9000000002', 'ADMIN');
+
+-- Hotels
+INSERT INTO Hotel (city_id, name, address, rating) VALUES
+((SELECT city_id FROM City WHERE name='Mumbai' AND country='India'),
+ 'Sea View Residency', 'Marine Drive, Mumbai', 4.3),
+((SELECT city_id FROM City WHERE name='Mumbai' AND country='India'),
+ 'Skyline Suites', 'Bandra West, Mumbai', 4.6),
+((SELECT city_id FROM City WHERE name='Goa' AND country='India'),
+ 'Palm Beach Resort', 'Calangute, Goa', 4.4);
+
+-- Room Types
+INSERT INTO RoomType (hotel_id, name, base_price, max_guests) VALUES
+((SELECT hotel_id FROM Hotel WHERE name='Sea View Residency'), 'Deluxe',    4500.00, 2),
+((SELECT hotel_id FROM Hotel WHERE name='Sea View Residency'), 'Suite',     7200.00, 3),
+((SELECT hotel_id FROM Hotel WHERE name='Skyline Suites'),    'Executive',  5800.00, 2),
+((SELECT hotel_id FROM Hotel WHERE name='Palm Beach Resort'), 'Cottage',    5000.00, 3);
+
+-- Procedure to fill inventory for N days from today with default qty
+
+DELIMITER $$
+CREATE PROCEDURE fill_inventory_next_days(IN p_days INT, IN p_default_qty INT)
+BEGIN
+  DECLARE done INT DEFAULT 0;
+  DECLARE v_room_type_id INT;
+  DECLARE v_start DATE;
+  DECLARE v_i INT;
+
+  DECLARE cur CURSOR FOR SELECT room_type_id FROM RoomType;
+  DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = 1;
+
+  SET v_start = CURRENT_DATE;
+
+  OPEN cur;
+  read_loop: LOOP
+    FETCH cur INTO v_room_type_id;
+    IF done = 1 THEN
+      LEAVE read_loop;
+    END IF;
+
+    SET v_i = 0;
+    day_loop: LOOP
+      IF v_i >= p_days THEN
+        LEAVE day_loop;
+      END IF;
+      INSERT IGNORE INTO RoomInventory (room_type_id, stay_date, qty)
+      VALUES (v_room_type_id, DATE_ADD(v_start, INTERVAL v_i DAY), p_default_qty);
+      SET v_i = v_i + 1;
+    END LOOP;
+  END LOOP;
+  CLOSE cur;
+END$$
+DELIMITER ;
+
+-- Fill the next 14 days with 5 rooms available per room type
+CALL fill_inventory_next_days(14, 5);

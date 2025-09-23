@@ -1,0 +1,79 @@
+USE travel_booking;
+
+-- 1) City
+CREATE TABLE City (
+  city_id INT PRIMARY KEY AUTO_INCREMENT,
+  name VARCHAR(80) NOT NULL,
+  country VARCHAR(80) NOT NULL,
+  UNIQUE(name, country)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 2) User (backticks since USER is reserved)
+CREATE TABLE `User` (
+  user_id INT PRIMARY KEY AUTO_INCREMENT,
+  full_name VARCHAR(120) NOT NULL,
+  email VARCHAR(120) NOT NULL UNIQUE,
+  phone VARCHAR(30),
+  role ENUM('CUSTOMER','ADMIN') DEFAULT 'CUSTOMER'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 3) Hotel
+CREATE TABLE Hotel (
+  hotel_id INT PRIMARY KEY AUTO_INCREMENT,
+  city_id INT NOT NULL,
+  name VARCHAR(120) NOT NULL,
+  address VARCHAR(255),
+  rating DECIMAL(2,1),
+  FOREIGN KEY (city_id) REFERENCES City(city_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 4) RoomType
+CREATE TABLE RoomType (
+  room_type_id INT PRIMARY KEY AUTO_INCREMENT,
+  hotel_id INT NOT NULL,
+  name VARCHAR(60) NOT NULL,     -- e.g., Deluxe, Suite
+  base_price DECIMAL(10,2) NOT NULL,
+  max_guests INT NOT NULL,
+  FOREIGN KEY (hotel_id) REFERENCES Hotel(hotel_id),
+  UNIQUE(hotel_id, name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 5) RoomInventory (date-wise availability per room type)
+CREATE TABLE RoomInventory (
+  room_type_id INT NOT NULL,
+  stay_date DATE NOT NULL,
+  qty INT NOT NULL CHECK (qty >= 0),
+  PRIMARY KEY (room_type_id, stay_date),
+  FOREIGN KEY (room_type_id) REFERENCES RoomType(room_type_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 6) Booking
+CREATE TABLE Booking (
+  booking_id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  user_id INT NOT NULL,
+  room_type_id INT NOT NULL,
+  check_in DATE NOT NULL,
+  check_out DATE NOT NULL,              -- exclusive
+  status ENUM('PENDING','CONFIRMED','CANCELLED') DEFAULT 'PENDING',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES `User`(user_id),
+  FOREIGN KEY (room_type_id) REFERENCES RoomType(room_type_id),
+  CHECK (check_in < check_out)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 7) Payment
+CREATE TABLE Payment (
+  payment_id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  booking_id BIGINT NOT NULL UNIQUE,
+  amount DECIMAL(10,2) NOT NULL,
+  method ENUM('CARD','UPI','NETBANKING','CASH') NOT NULL,
+  status ENUM('INITIATED','SUCCESS','FAILED','REFUNDED') DEFAULT 'INITIATED',
+  paid_at TIMESTAMP NULL,
+  FOREIGN KEY (booking_id) REFERENCES Booking(booking_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Helpful indexes
+CREATE INDEX idx_hotel_city ON Hotel(city_id);
+CREATE INDEX idx_roomtype_hotel ON RoomType(hotel_id);
+CREATE INDEX idx_inv_date ON RoomInventory(stay_date);
+CREATE INDEX idx_booking_user ON Booking(user_id);
