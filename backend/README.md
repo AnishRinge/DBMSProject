@@ -1,18 +1,25 @@
-# Travel & Hotel Booking API
+# Travel Booking System - Backend API
 
-A comprehensive RESTful API for a travel and hotel booking system built with Node.js, Express, and MySQL.
+A comprehensive RESTful API for a travel booking system built with Node.js, Express, and MySQL.
 
 ## 🚀 Features
 
-- **User Authentication** - JWT-based registration and login
-- **Hotel Management** - Browse cities, hotels, and room types
-- **Dynamic Pricing** - Seasonal pricing with configurable multipliers
-- **Booking System** - Create, view, and cancel bookings with inventory management
-- **Payment Processing** - Simulated payment gateway integration
-- **Review System** - Customer reviews with helpful votes
-- **Admin Controls** - Administrative endpoints for pricing and reviews
-- **Rate Limiting** - API protection against abuse
-- **Comprehensive Documentation** - Built-in API documentation
+- **User Authentication** - JWT-based auth with role-based access (Customer/Admin)
+- **City Management** - CRUD operations for cities
+- **Hotel Management** - Hotel listings with ratings and locations  
+- **Room Booking** - Real-time availability and booking system
+- **Review System** - User reviews with helpfulness voting
+- **Seasonal Pricing** - Dynamic pricing based on seasons and demand
+- **Payment Processing** - Booking payments and tracking
+
+## 🛠️ Tech Stack
+
+- **Backend**: Node.js, Express.js
+- **Database**: MySQL 8.0+
+- **Authentication**: JWT (JSON Web Tokens)
+- **Validation**: express-validator
+- **Security**: bcryptjs, CORS, Rate limiting
+- **Testing**: Jest, Supertest
 
 ## 📋 Prerequisites
 
@@ -22,9 +29,9 @@ A comprehensive RESTful API for a travel and hotel booking system built with Nod
 
 ## 🛠 Installation
 
-1. **Clone and navigate to the API directory:**
+1. **Navigate to the backend directory:**
    ```bash
-   cd DBMSProject/api
+   cd DBMSProject/backend
    ```
 
 2. **Install dependencies:**

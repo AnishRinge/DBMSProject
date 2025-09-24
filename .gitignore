@@ -67,3 +67,8 @@ desktop.ini
 # Uploads (if you have file upload functionality)
 uploads/
 public/uploads/
+
+# Frontend build
+frontend/build/
+frontend/.env
+frontend/node_modules/

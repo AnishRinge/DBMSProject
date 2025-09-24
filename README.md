@@ -1,25 +1,47 @@
-# Travel Booking System - Backend API
+# Travel Booking System
 
-A comprehensive RESTful API for a travel booking system built with Node.js, Express, and MySQL.
+A complete full-stack travel booking application with a Node.js/Express backend API and modern React frontend.
 
-## 🚀 Features
+## 🏗️ Project Structure
 
-- **User Authentication** - JWT-based auth with role-based access (Customer/Admin)
-- **City Management** - CRUD operations for cities
-- **Hotel Management** - Hotel listings with ratings and locations  
-- **Room Booking** - Real-time availability and booking system
-- **Review System** - User reviews with helpfulness voting
-- **Seasonal Pricing** - Dynamic pricing based on seasons and demand
-- **Payment Processing** - Booking payments and tracking
+```
+DBMSProject/
+├── backend/                    # Node.js/Express API
+│   ├── config/                # Database configuration
+│   ├── middleware/            # Auth and validation middleware
+│   ├── routes/               # API route handlers
+│   ├── tests/                # API tests
+│   ├── package.json          # Backend dependencies
+│   └── app.js               # Main server file
+├── frontend/                  # React application
+│   ├── src/                  # React source code
+│   ├── public/               # Static assets
+│   ├── package.json          # Frontend dependencies
+│   └── README.md            # Frontend documentation
+├── database/                  # Database files
+│   ├── create tables.txt     # Database schema
+│   ├── seed sample data.txt  # Sample data
+│   └── enhanced_tables.txt   # Additional schema info
+└── README.md                 # This file
+```
 
-## 🛠️ Tech Stack
+## � Tech Stack
 
-- **Backend**: Node.js, Express.js
-- **Database**: MySQL 8.0+
-- **Authentication**: JWT (JSON Web Tokens)
-- **Validation**: express-validator
-- **Security**: bcryptjs, CORS, Rate limiting
-- **Testing**: Jest, Supertest
+### Backend
+- **Node.js & Express.js** - RESTful API server
+- **MySQL 8.0+** - Primary database
+- **JWT Authentication** - Secure user sessions
+- **bcryptjs** - Password hashing
+- **express-validator** - Input validation
+- **CORS & Rate Limiting** - Security features
+
+### Frontend
+- **React 18** - Modern UI framework
+- **Tailwind CSS** - Utility-first styling
+- **React Router v6** - Client-side routing
+- **Axios** - HTTP client for API calls
+- **React Hot Toast** - User notifications
+- **Lucide React** - Beautiful icons
 
 ## 📋 Prerequisites
 
@@ -30,9 +52,8 @@ Before running this project, make sure you have:
   - [XAMPP](https://www.apachefriends.org/) (Recommended for Windows)
   - [MySQL Community Server](https://dev.mysql.com/downloads/mysql/)
   - [WAMP](https://www.wampserver.com/) (Windows)
-- **Postman** (for API testing) - [Download here](https://www.postman.com/)
 
-## 🔧 Local Setup Instructions
+## � Quick Start
 
 ### 1. Clone the Repository
 ```bash
@@ -40,11 +61,28 @@ git clone <your-repo-url>
 cd DBMSProject
 ```
 
-### 2. Install Dependencies
+### 2. Setup Database
+Follow the database setup instructions below to create and populate your MySQL database.
+
+### 3. Setup Backend
 ```bash
-cd api
+cd backend
 npm install
+cp .env.example .env
+# Update .env with your database credentials
+npm start
 ```
+
+### 4. Setup Frontend
+```bash
+cd frontend
+npm install
+npm start
+```
+
+### 5. Access Application
+- **Frontend**: http://localhost:3001
+- **Backend API**: http://localhost:3000
 
 ### 3. Database Setup
 
@@ -80,7 +118,7 @@ mysql -u root -p travel_booking < "seed sample data.txt"
 
 ### 4. Environment Configuration
 
-Create a `.env` file in the `api` directory:
+Create a `.env` file in the `backend` directory:
 
 ```env
 # Database Configuration
@@ -108,17 +146,56 @@ RATE_LIMIT_MAX_REQUESTS=100
 - Change `JWT_SECRET` to a secure random string
 - For XAMPP, usually no password is needed for root user
 
-### 5. Start the Server
-```bash
-npm start
-```
+## 🔧 Detailed Setup Instructions
 
-You should see:
-```
-🚀 Server is running on port 3000
-✅ Database connected successfully
-📊 Connected to: travel_booking on localhost:3306
-```
+### Backend Setup
+
+1. **Navigate to backend directory:**
+   ```bash
+   cd backend
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+3. **Configure environment:**
+   ```bash
+   cp .env.example .env
+   ```
+   Update the `.env` file with your database credentials.
+
+4. **Start the backend server:**
+   ```bash
+   npm start
+   ```
+
+   You should see:
+   ```
+   🚀 Server is running on port 3000
+   ✅ Database connected successfully
+   📊 Connected to: travel_booking on localhost:3306
+   ```
+
+### Frontend Setup
+
+1. **Navigate to frontend directory:**
+   ```bash
+   cd frontend  
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+3. **Start the development server:**
+   ```bash
+   npm start
+   ```
+
+   The frontend will open at http://localhost:3001
 
 ### 6. Test the API
 
