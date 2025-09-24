@@ -14,6 +14,7 @@ CREATE TABLE `User` (
   full_name VARCHAR(120) NOT NULL,
   email VARCHAR(120) NOT NULL UNIQUE,
   phone VARCHAR(30),
+  password_hash VARCHAR(255), -- For API authentication
   role ENUM('CUSTOMER','ADMIN') DEFAULT 'CUSTOMER'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -70,6 +71,59 @@ CREATE TABLE Payment (
   status ENUM('INITIATED','SUCCESS','FAILED','REFUNDED') DEFAULT 'INITIATED',
   paid_at TIMESTAMP NULL,
   FOREIGN KEY (booking_id) REFERENCES Booking(booking_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 8) Review (customer reviews and ratings)
+CREATE TABLE Review (
+  review_id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  booking_id BIGINT NOT NULL,
+  hotel_id INT NOT NULL,
+  user_id INT NOT NULL,
+  rating INT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+  review_text TEXT,
+  review_title VARCHAR(200),
+  is_verified BOOLEAN DEFAULT FALSE, -- Only users who actually stayed can review
+  helpful_count INT DEFAULT 0, -- Number of users who found this review helpful
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (booking_id) REFERENCES Booking(booking_id),
+  FOREIGN KEY (hotel_id) REFERENCES Hotel(hotel_id),
+  FOREIGN KEY (user_id) REFERENCES `User`(user_id),
+  UNIQUE(booking_id), -- One review per booking
+  INDEX idx_review_hotel (hotel_id),
+  INDEX idx_review_rating (rating),
+  INDEX idx_review_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 9) SeasonalPricing (dynamic pricing based on seasons/events)
+CREATE TABLE SeasonalPricing (
+  pricing_id INT PRIMARY KEY AUTO_INCREMENT,
+  room_type_id INT NOT NULL,
+  season_name VARCHAR(50) NOT NULL,
+  description TEXT,
+  start_date DATE NOT NULL,
+  end_date DATE NOT NULL,
+  price_multiplier DECIMAL(4,2) NOT NULL DEFAULT 1.00, -- 1.5 = 50% increase, 0.8 = 20% discount
+  is_active BOOLEAN DEFAULT TRUE,
+  priority INT DEFAULT 1, -- Higher priority pricing takes precedence
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (room_type_id) REFERENCES RoomType(room_type_id),
+  CHECK (start_date <= end_date),
+  CHECK (price_multiplier > 0 AND price_multiplier <= 5.0),
+  INDEX idx_seasonal_room_type (room_type_id),
+  INDEX idx_seasonal_dates (start_date, end_date),
+  INDEX idx_seasonal_active (is_active, priority)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 10) ReviewHelpful (track helpful votes on reviews)
+CREATE TABLE ReviewHelpful (
+  review_id BIGINT NOT NULL,
+  user_id INT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (review_id, user_id),
+  FOREIGN KEY (review_id) REFERENCES Review(review_id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES `User`(user_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Helpful indexes

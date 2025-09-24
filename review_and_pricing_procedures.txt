@@ -1,0 +1,200 @@
+USE travel_booking;
+
+-- Helper functions and procedures for Reviews and SeasonalPricing
+
+-- Function to calculate seasonal price for a specific date
+DELIMITER $$
+CREATE FUNCTION GetSeasonalPrice(
+    p_room_type_id INT,
+    p_date DATE
+) RETURNS DECIMAL(10,2)
+READS SQL DATA
+DETERMINISTIC
+BEGIN
+    DECLARE base_price DECIMAL(10,2);
+    DECLARE multiplier DECIMAL(4,2) DEFAULT 1.00;
+    
+    -- Get base price
+    SELECT rt.base_price INTO base_price
+    FROM RoomType rt
+    WHERE rt.room_type_id = p_room_type_id;
+    
+    -- Get highest priority active seasonal pricing for the date
+    SELECT sp.price_multiplier INTO multiplier
+    FROM SeasonalPricing sp
+    WHERE sp.room_type_id = p_room_type_id
+      AND sp.is_active = TRUE
+      AND p_date BETWEEN sp.start_date AND sp.end_date
+    ORDER BY sp.priority DESC, sp.pricing_id DESC
+    LIMIT 1;
+    
+    RETURN ROUND(base_price * IFNULL(multiplier, 1.00), 2);
+END$$
+DELIMITER ;
+
+-- Procedure to add a review (with validation)
+DELIMITER $$
+CREATE PROCEDURE AddReview(
+    IN p_booking_id BIGINT,
+    IN p_user_id INT,
+    IN p_rating INT,
+    IN p_review_title VARCHAR(200),
+    IN p_review_text TEXT
+)
+BEGIN
+    DECLARE v_hotel_id INT;
+    DECLARE v_booking_user_id INT;
+    DECLARE v_booking_status ENUM('PENDING','CONFIRMED','CANCELLED');
+    DECLARE v_existing_review_count INT DEFAULT 0;
+    
+    -- Validate that the booking exists and belongs to the user
+    SELECT b.user_id, b.status, rt.hotel_id
+    INTO v_booking_user_id, v_booking_status, v_hotel_id
+    FROM Booking b
+    JOIN RoomType rt ON b.room_type_id = rt.room_type_id
+    WHERE b.booking_id = p_booking_id;
+    
+    -- Check if booking exists
+    IF v_booking_user_id IS NULL THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Booking not found';
+    END IF;
+    
+    -- Check if user owns this booking
+    IF v_booking_user_id != p_user_id THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'You can only review your own bookings';
+    END IF;
+    
+    -- Check if booking was completed (not cancelled)
+    IF v_booking_status = 'CANCELLED' THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Cannot review a cancelled booking';
+    END IF;
+    
+    -- Check if review already exists for this booking
+    SELECT COUNT(*) INTO v_existing_review_count
+    FROM Review
+    WHERE booking_id = p_booking_id;
+    
+    IF v_existing_review_count > 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Review already exists for this booking';
+    END IF;
+    
+    -- Insert the review
+    INSERT INTO Review (booking_id, hotel_id, user_id, rating, review_title, review_text, is_verified)
+    VALUES (p_booking_id, v_hotel_id, p_user_id, p_rating, p_review_title, p_review_text, TRUE);
+    
+END$$
+DELIMITER ;
+
+-- Procedure to mark a review as helpful
+DELIMITER $$
+CREATE PROCEDURE MarkReviewHelpful(
+    IN p_review_id BIGINT,
+    IN p_user_id INT
+)
+BEGIN
+    DECLARE v_existing_count INT DEFAULT 0;
+    
+    -- Check if user already marked this review as helpful
+    SELECT COUNT(*) INTO v_existing_count
+    FROM ReviewHelpful
+    WHERE review_id = p_review_id AND user_id = p_user_id;
+    
+    IF v_existing_count > 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'You have already marked this review as helpful';
+    END IF;
+    
+    -- Add helpful vote
+    INSERT INTO ReviewHelpful (review_id, user_id)
+    VALUES (p_review_id, p_user_id);
+    
+    -- Update helpful count in Review table
+    UPDATE Review
+    SET helpful_count = helpful_count + 1
+    WHERE review_id = p_review_id;
+    
+END$$
+DELIMITER ;
+
+-- Procedure to add seasonal pricing
+DELIMITER $$
+CREATE PROCEDURE AddSeasonalPricing(
+    IN p_room_type_id INT,
+    IN p_season_name VARCHAR(50),
+    IN p_description TEXT,
+    IN p_start_date DATE,
+    IN p_end_date DATE,
+    IN p_price_multiplier DECIMAL(4,2),
+    IN p_priority INT
+)
+BEGIN
+    -- Validate date range
+    IF p_start_date >= p_end_date THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Start date must be before end date';
+    END IF;
+    
+    -- Validate price multiplier
+    IF p_price_multiplier <= 0 OR p_price_multiplier > 5.0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Price multiplier must be between 0 and 5.0';
+    END IF;
+    
+    -- Insert seasonal pricing
+    INSERT INTO SeasonalPricing (room_type_id, season_name, description, start_date, end_date, price_multiplier, priority)
+    VALUES (p_room_type_id, p_season_name, p_description, p_start_date, p_end_date, p_price_multiplier, p_priority);
+    
+END$$
+DELIMITER ;
+
+-- View for hotel ratings summary
+CREATE VIEW HotelRatingSummary AS
+SELECT 
+    h.hotel_id,
+    h.name as hotel_name,
+    h.rating as base_rating,
+    COUNT(r.review_id) as total_reviews,
+    ROUND(AVG(r.rating), 2) as average_review_rating,
+    COUNT(CASE WHEN r.rating = 5 THEN 1 END) as five_star_count,
+    COUNT(CASE WHEN r.rating = 4 THEN 1 END) as four_star_count,
+    COUNT(CASE WHEN r.rating = 3 THEN 1 END) as three_star_count,
+    COUNT(CASE WHEN r.rating = 2 THEN 1 END) as two_star_count,
+    COUNT(CASE WHEN r.rating = 1 THEN 1 END) as one_star_count,
+    MAX(r.created_at) as latest_review_date
+FROM Hotel h
+LEFT JOIN Review r ON h.hotel_id = r.hotel_id
+GROUP BY h.hotel_id, h.name, h.rating;
+
+-- View for room pricing with seasonal adjustments
+CREATE VIEW RoomPricingView AS
+SELECT 
+    rt.room_type_id,
+    rt.name as room_type_name,
+    h.name as hotel_name,
+    rt.base_price,
+    CURRENT_DATE as price_date,
+    GetSeasonalPrice(rt.room_type_id, CURRENT_DATE) as current_price,
+    ROUND(((GetSeasonalPrice(rt.room_type_id, CURRENT_DATE) - rt.base_price) / rt.base_price) * 100, 2) as price_change_percent,
+    sp.season_name as active_season
+FROM RoomType rt
+JOIN Hotel h ON rt.hotel_id = h.hotel_id
+LEFT JOIN SeasonalPricing sp ON rt.room_type_id = sp.room_type_id 
+    AND CURRENT_DATE BETWEEN sp.start_date AND sp.end_date 
+    AND sp.is_active = TRUE
+ORDER BY h.name, rt.name;
+
+-- View for recent reviews with hotel information
+CREATE VIEW RecentReviews AS
+SELECT 
+    r.review_id,
+    r.rating,
+    r.review_title,
+    r.review_text,
+    r.helpful_count,
+    r.created_at,
+    u.full_name as reviewer_name,
+    h.name as hotel_name,
+    c.name as city_name
+FROM Review r
+JOIN `User` u ON r.user_id = u.user_id
+JOIN Hotel h ON r.hotel_id = h.hotel_id
+JOIN City c ON h.city_id = c.city_id
+WHERE r.is_verified = TRUE
+ORDER BY r.created_at DESC;
